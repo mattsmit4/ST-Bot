@@ -1,0 +1,1482 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ST-Bot &#8212; Architecture</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>&#9889;</text></svg>">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=DM+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: #0a0e17;
+    color: #e2e8f0;
+    font-family: 'DM Sans', sans-serif;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* --- TOP NAV --- */
+  .topnav {
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 32px;
+    background: rgba(10, 14, 23, 0.85);
+    backdrop-filter: blur(16px);
+    border-bottom: 1px solid #1e293b;
+  }
+
+  .topnav-brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .topnav-logo {
+    width: 32px;
+    height: 32px;
+    background: linear-gradient(135deg, #38bdf8, #818cf8);
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+    font-weight: 700;
+    color: #0a0e17;
+  }
+
+  .topnav-title {
+    font-size: 16px;
+    font-weight: 700;
+    color: #f8fafc;
+  }
+
+  .topnav-title span {
+    color: #64748b;
+    font-weight: 400;
+    margin-left: 8px;
+  }
+
+  .topnav-tabs {
+    display: flex;
+    gap: 4px;
+  }
+
+  .tab {
+    padding: 8px 16px;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 500;
+    color: #64748b;
+    cursor: pointer;
+    transition: all 0.2s;
+    border: none;
+    background: none;
+  }
+
+  .tab:hover { color: #94a3b8; background: #1e293b; }
+  .tab.active { color: #f8fafc; background: #1e293b; }
+
+  .topnav-meta {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: #475569;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+
+  .status-dot {
+    width: 7px;
+    height: 7px;
+    background: #22c55e;
+    border-radius: 50%;
+    display: inline-block;
+    margin-right: 6px;
+    animation: pulse 2s infinite;
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+  }
+
+  /* --- MAIN CONTENT --- */
+  .main {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 48px 24px 80px;
+    overflow-y: auto;
+  }
+
+  /* --- VIEWS --- */
+  .view { display: none; width: 100%; flex-direction: column; align-items: center; }
+  .view.active { display: flex; }
+
+  /* --- FLOW CONTAINER --- */
+  .flow {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    width: 100%;
+    max-width: 1300px;
+  }
+
+  /* --- SHARED NODE --- */
+  .node {
+    border-radius: 14px;
+    padding: 20px 28px;
+    text-align: center;
+    border: 1.5px solid;
+    position: relative;
+    cursor: pointer;
+    transition: transform 0.25s, box-shadow 0.25s;
+    opacity: 0;
+    transform: translateY(14px);
+    animation: fadeUp 0.5s ease forwards;
+  }
+
+  .node:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 12px 40px rgba(0,0,0,0.35);
+  }
+
+  @keyframes fadeUp { to { opacity: 1; transform: translateY(0); } }
+
+  .node-tag {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 1.6px;
+    text-transform: uppercase;
+    margin-bottom: 3px;
+  }
+
+  .node-title {
+    font-size: 17px;
+    font-weight: 700;
+  }
+
+  .node-sub {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    opacity: 0.5;
+    margin-top: 2px;
+  }
+
+  /* Click hint */
+  .click-hint {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    color: #334155;
+    position: absolute;
+    bottom: 6px;
+    right: 12px;
+    opacity: 0;
+    transition: opacity 0.2s;
+  }
+  .node:hover .click-hint { opacity: 1; }
+
+  /* LLM badge */
+  .llm-badge {
+    position: absolute;
+    top: -8px;
+    left: -8px;
+    background: linear-gradient(135deg, #7c3aed, #6d28d9);
+    color: #f8fafc;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    font-weight: 700;
+    padding: 3px 8px;
+    border-radius: 8px;
+    border: 1px solid #7c3aed66;
+    z-index: 10;
+    letter-spacing: 0.5px;
+    box-shadow: 0 2px 8px rgba(124, 58, 237, 0.3);
+  }
+
+  /* --- NODE COLORS --- */
+  .n-storefront { background: linear-gradient(135deg, #0f1d32, #162038); border-color: #2563eb44; }
+  .n-storefront .node-tag { color: #60a5fa; }
+  .n-storefront .node-title { color: #93bbfc; }
+
+  .n-sorter { background: linear-gradient(135deg, #1a1530, #241e3a); border-color: #7c3aed55; }
+  .n-sorter .node-tag { color: #a78bfa; }
+  .n-sorter .node-title { color: #c4b5fd; }
+
+  .n-intent { background: linear-gradient(135deg, #1a2012, #222e18); border-color: #84cc1655; }
+  .n-intent .node-tag { color: #bef264; }
+  .n-intent .node-title { color: #d9f99d; }
+
+  .n-filter { background: linear-gradient(135deg, #0f2028, #142a30); border-color: #06b6d444; }
+  .n-filter .node-tag { color: #22d3ee; }
+  .n-filter .node-title { color: #67e8f9; }
+
+  .n-handler { background: linear-gradient(135deg, #2a1a10, #2e2014); border-color: #f59e0b44; }
+  .n-handler .node-tag { color: #fbbf24; }
+  .n-handler .node-title { color: #fcd34d; }
+
+  .n-output { background: linear-gradient(135deg, #1c1016, #2a1520); border-color: #ec489955; }
+  .n-output .node-tag { color: #f472b6; }
+  .n-output .node-title { color: #f9a8d4; }
+
+  /* --- ARROWS --- */
+  .arrow {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 5px 0;
+    opacity: 0;
+    animation: fadeUp 0.3s ease forwards;
+  }
+
+  .arrow-line { width: 2px; height: 26px; background: linear-gradient(180deg, #334155, #475569); }
+  .arrow-head { width: 0; height: 0; border-left: 6px solid transparent; border-right: 6px solid transparent; border-top: 8px solid #475569; }
+  .arrow-text { font-family: 'JetBrains Mono', monospace; font-size: 10.5px; color: #64748b; margin-top: 3px; text-align: center; }
+
+  /* --- DIAMOND --- */
+  .diamond-row {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0;
+    width: 100%;
+    max-width: 1200px;
+    margin: 4px 0;
+    opacity: 0;
+    animation: fadeUp 0.4s ease forwards;
+  }
+
+  .diamond-arm { flex: 1; height: 2px; background: #33415566; }
+
+  .diamond-center {
+    position: relative;
+    width: 130px;
+    height: 75px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+
+  .diamond-shape {
+    position: absolute;
+    width: 110px;
+    height: 62px;
+    background: linear-gradient(135deg, #1a2012, #222e18);
+    border: 2px solid #84cc1644;
+    transform: rotate(45deg);
+    border-radius: 8px;
+  }
+
+  .diamond-inner {
+    position: relative;
+    z-index: 2;
+    text-align: center;
+  }
+  .diamond-inner .node-tag { color: #bef264; font-size: 9px; }
+  .diamond-inner .node-title { color: #d9f99d; font-size: 12px; }
+
+  /* --- INTENT CARDS (fan-out) --- */
+  .branch-box {
+    border-radius: 10px;
+    padding: 14px 10px;
+    border: 1.5px solid;
+    text-align: center;
+    cursor: pointer;
+    transition: transform 0.25s, box-shadow 0.25s;
+    position: relative;
+  }
+
+  .branch-box:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 28px rgba(0,0,0,0.3);
+  }
+
+  .branch-fast {
+    background: linear-gradient(135deg, #2a1a10, #2e2014);
+    border-color: #f59e0b44;
+  }
+  .branch-fast .node-tag { color: #fbbf24; }
+  .branch-fast .node-title { color: #fcd34d; }
+
+  .branch-deep {
+    background: linear-gradient(135deg, #0f1d2e, #132840);
+    border-color: #38bdf844;
+  }
+  .branch-deep .node-tag { color: #38bdf8; }
+  .branch-deep .node-title { color: #7dd3fc; }
+
+  /* --- HANDLER CARDS --- */
+  .handler-card {
+    border-radius: 10px;
+    padding: 14px 10px;
+    border: 1.5px solid #f59e0b44;
+    background: linear-gradient(135deg, #2a1a10, #2e2014);
+    text-align: center;
+    cursor: pointer;
+    transition: transform 0.25s, box-shadow 0.25s;
+    position: relative;
+  }
+
+  .handler-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 28px rgba(0,0,0,0.3);
+  }
+
+  .handler-card .node-tag { color: #fbbf24; }
+  .handler-card .node-title { color: #fcd34d; }
+
+  /* --- V CONNECTOR --- */
+  .v-connector {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 4px 0;
+  }
+  .v-line { width: 2px; height: 18px; background: #475569; }
+  .v-head { width: 0; height: 0; border-left: 5px solid transparent; border-right: 5px solid transparent; border-top: 7px solid #475569; }
+
+  /* --- MODAL --- */
+  .modal-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.7);
+    backdrop-filter: blur(6px);
+    z-index: 200;
+    justify-content: center;
+    align-items: center;
+    padding: 24px;
+  }
+  .modal-overlay.open { display: flex; }
+
+  .modal-panel {
+    background: #141b2d;
+    border: 1px solid #1e293b;
+    border-radius: 16px;
+    padding: 32px;
+    max-width: 600px;
+    width: 100%;
+    max-height: 80vh;
+    overflow-y: auto;
+    position: relative;
+    animation: modalIn 0.25s ease;
+  }
+
+  @keyframes modalIn {
+    from { opacity: 0; transform: scale(0.95) translateY(10px); }
+    to { opacity: 1; transform: scale(1) translateY(0); }
+  }
+
+  .modal-close {
+    position: absolute;
+    top: 16px;
+    right: 16px;
+    background: none;
+    border: none;
+    color: #64748b;
+    font-size: 20px;
+    cursor: pointer;
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.2s, color 0.2s;
+  }
+  .modal-close:hover { background: #1e293b; color: #f8fafc; }
+
+  .modal-label {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 1.6px;
+    text-transform: uppercase;
+    margin-bottom: 4px;
+  }
+
+  .modal-title {
+    font-size: 22px;
+    font-weight: 700;
+    color: #f8fafc;
+    margin-bottom: 16px;
+  }
+
+  .modal-section { margin-bottom: 20px; }
+
+  .modal-section h4 {
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    color: #64748b;
+    margin-bottom: 8px;
+  }
+
+  .modal-section p,
+  .modal-section li {
+    font-size: 14px;
+    color: #cbd5e1;
+    line-height: 1.7;
+  }
+
+  .modal-section ul { list-style: none; padding: 0; }
+
+  .modal-section li {
+    padding: 4px 0 4px 16px;
+    position: relative;
+  }
+
+  .modal-section li::before {
+    content: '\2192';
+    position: absolute;
+    left: 0;
+    color: #475569;
+  }
+
+  .modal-file-tag {
+    display: inline-block;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    background: #0f172a;
+    border: 1px solid #1e293b;
+    border-radius: 6px;
+    padding: 4px 10px;
+    color: #94a3b8;
+    margin-right: 6px;
+    margin-bottom: 6px;
+  }
+
+  /* --- LLM SUMMARY --- */
+  .llm-summary {
+    margin-top: 16px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: #64748b;
+    text-align: center;
+    padding: 8px 16px;
+    border: 1px solid #1e293b;
+    border-radius: 8px;
+    background: #141b2d;
+    opacity: 0;
+    animation: fadeUp 0.4s ease forwards;
+  }
+  .llm-summary strong { color: #a78bfa; }
+
+  /* --- ABOUT VIEW --- */
+  .about-content {
+    max-width: 600px;
+    line-height: 1.8;
+    color: #94a3b8;
+    font-size: 15px;
+    margin-top: 24px;
+  }
+
+  .about-content h2 {
+    font-size: 22px;
+    color: #f8fafc;
+    margin-bottom: 12px;
+  }
+
+  .about-content strong { color: #e2e8f0; }
+
+  .stat-row {
+    display: flex;
+    gap: 24px;
+    margin: 24px 0;
+  }
+
+  .stat-box {
+    background: #141b2d;
+    border: 1px solid #1e293b;
+    border-radius: 12px;
+    padding: 20px;
+    text-align: center;
+    flex: 1;
+  }
+
+  .stat-box .num {
+    font-size: 28px;
+    font-weight: 700;
+    background: linear-gradient(135deg, #38bdf8, #818cf8);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+
+  .stat-box .label {
+    font-size: 12px;
+    color: #64748b;
+    margin-top: 4px;
+  }
+
+  .bottom-label {
+    margin-top: 48px;
+    text-align: center;
+    font-size: 12px;
+    color: #334155;
+    letter-spacing: 0.5px;
+  }
+
+  /* --- PATH LABELS --- */
+  .path-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    font-weight: 700;
+    padding: 5px 14px;
+    border-radius: 8px;
+    display: inline-block;
+    margin-bottom: 8px;
+  }
+
+  .path-fast { background: #f59e0b18; color: #fbbf24; border: 1px solid #f59e0b33; }
+  .path-deep { background: #38bdf818; color: #38bdf8; border: 1px solid #38bdf833; }
+
+  /* Stagger delays */
+  .d1 { animation-delay: 0.05s; }
+  .d2 { animation-delay: 0.12s; }
+  .d3 { animation-delay: 0.19s; }
+  .d4 { animation-delay: 0.26s; }
+  .d5 { animation-delay: 0.33s; }
+  .d6 { animation-delay: 0.40s; }
+  .d7 { animation-delay: 0.47s; }
+  .d8 { animation-delay: 0.54s; }
+  .d9 { animation-delay: 0.61s; }
+  .d10 { animation-delay: 0.68s; }
+  .d11 { animation-delay: 0.75s; }
+  .d12 { animation-delay: 0.82s; }
+  .d13 { animation-delay: 0.89s; }
+  .d14 { animation-delay: 0.96s; }
+  .d15 { animation-delay: 1.03s; }
+</style>
+</head>
+<body>
+
+<!-- TOP NAV -->
+<nav class="topnav">
+  <div class="topnav-brand">
+    <div class="topnav-logo">ST</div>
+    <div class="topnav-title">ST-Bot <span>Architecture</span></div>
+  </div>
+  <div class="topnav-tabs">
+    <button class="tab active" onclick="switchView('flow')">Flow</button>
+    <button class="tab" onclick="switchView('about')">About</button>
+  </div>
+  <div class="topnav-meta">
+    <span><span class="status-dot"></span>v2.0</span>
+  </div>
+</nav>
+
+<!-- MAIN -->
+<div class="main">
+
+  <!-- ============================================================ -->
+  <!-- FLOW VIEW                                                     -->
+  <!-- ============================================================ -->
+  <div id="view-flow" class="view active">
+    <div class="flow">
+
+      <!-- ===== STEP 1: STOREFRONT ===== -->
+      <div class="node n-storefront d1" onclick="openModal('storefront')" style="width:460px;">
+        <div class="node-tag">Step 1 &mdash; Storefront</div>
+        <div class="node-title">Customer Chat UI</div>
+        <div class="node-sub">app.py &mdash; Streamlit</div>
+        <span class="click-hint">click</span>
+      </div>
+
+      <div class="arrow d2">
+        <div class="arrow-line"></div>
+        <div class="arrow-head"></div>
+        <div class="arrow-text">raw query sent</div>
+      </div>
+
+      <!-- ===== STEP 2: SORTER ===== -->
+      <div class="node n-sorter d3" onclick="openModal('sorter')" style="width:520px;">
+        <div class="node-tag">Step 2 &mdash; Sorter</div>
+        <div class="node-title">Clean &amp; Validate</div>
+        <div class="node-sub">orchestrator.py</div>
+        <span class="click-hint">click</span>
+      </div>
+
+      <div class="arrow d4">
+        <div class="arrow-line"></div>
+        <div class="arrow-head"></div>
+        <div class="arrow-text">cleaned query + conversation state</div>
+      </div>
+
+      <!-- ===== STEP 3: INTENT CLASSIFIER ===== -->
+      <div class="node n-intent d5" onclick="openModal('intent')" style="width:520px;">
+        <div class="llm-badge">LLM x1</div>
+        <div class="node-tag">Step 3 &mdash; Intent Classifier</div>
+        <div class="node-title">What Type of Question Is This?</div>
+        <div class="node-sub">LLM call &mdash; GPT-4o-mini</div>
+        <span class="click-hint">click</span>
+      </div>
+
+      <div class="arrow d6" style="padding-bottom:2px;">
+        <div class="arrow-line" style="height:16px;"></div>
+      </div>
+
+      <!-- ===== DIAMOND: ROUTE ===== -->
+      <div class="diamond-row d6" style="max-width:1200px;">
+        <div class="diamond-arm"></div>
+        <div class="diamond-center">
+          <div class="diamond-shape"></div>
+          <div class="diamond-inner">
+            <div class="node-tag">ROUTE</div>
+            <div class="node-title">Which path?</div>
+          </div>
+        </div>
+        <div class="diamond-arm"></div>
+      </div>
+
+      <!-- ===== FAN-OUT: ALL 8 INTENTS ===== -->
+      <div style="width:100%;max-width:1200px;opacity:0;animation:fadeUp 0.5s ease forwards;animation-delay:0.47s;">
+
+        <!-- SVG fan lines -->
+        <svg width="100%" height="55" style="display:block;">
+          <!-- Left 3 (amber) -->
+          <line x1="50%" y1="0" x2="6.25%" y2="50" stroke="#f59e0b88" stroke-width="1.5"/>
+          <line x1="50%" y1="0" x2="18.75%" y2="50" stroke="#f59e0b88" stroke-width="1.5"/>
+          <line x1="50%" y1="0" x2="31.25%" y2="50" stroke="#f59e0b88" stroke-width="1.5"/>
+          <!-- Right 5 (blue) -->
+          <line x1="50%" y1="0" x2="43.75%" y2="50" stroke="#38bdf888" stroke-width="1.5"/>
+          <line x1="50%" y1="0" x2="56.25%" y2="50" stroke="#38bdf888" stroke-width="1.5"/>
+          <line x1="50%" y1="0" x2="68.75%" y2="50" stroke="#38bdf888" stroke-width="1.5"/>
+          <line x1="50%" y1="0" x2="81.25%" y2="50" stroke="#38bdf888" stroke-width="1.5"/>
+          <line x1="50%" y1="0" x2="93.75%" y2="50" stroke="#38bdf888" stroke-width="1.5"/>
+        </svg>
+
+        <!-- 8 intent cards -->
+        <div style="display:grid;grid-template-columns:repeat(8,1fr);gap:8px;width:100%;">
+          <!-- FAST EXIT: 3 amber cards -->
+          <div class="branch-box branch-fast" onclick="openModal('greeting')">
+            <div style="font-size:18px;margin-bottom:4px;">&#128075;</div>
+            <div class="node-title" style="font-size:12px;">Greeting</div>
+            <span class="click-hint">click</span>
+          </div>
+          <div class="branch-box branch-fast" onclick="openModal('farewell')">
+            <div style="font-size:18px;margin-bottom:4px;">&#9996;&#65039;</div>
+            <div class="node-title" style="font-size:12px;">Farewell</div>
+            <span class="click-hint">click</span>
+          </div>
+          <div class="branch-box branch-fast" onclick="openModal('forbidden')">
+            <div style="font-size:18px;margin-bottom:4px;">&#128683;</div>
+            <div class="node-title" style="font-size:12px;">Out of Scope</div>
+            <span class="click-hint">click</span>
+          </div>
+
+          <!-- DEEP PIPELINE: 5 blue cards -->
+          <div class="branch-box branch-deep" onclick="openModal('newSearch')">
+            <div style="font-size:18px;margin-bottom:4px;">&#128270;</div>
+            <div class="node-title" style="font-size:12px;">New Search</div>
+            <span class="click-hint">click</span>
+          </div>
+          <div class="branch-box branch-deep" onclick="openModal('followUp')">
+            <div style="font-size:18px;margin-bottom:4px;">&#128260;</div>
+            <div class="node-title" style="font-size:12px;">Follow-Up</div>
+            <span class="click-hint">click</span>
+          </div>
+          <div class="branch-box branch-deep" onclick="openModal('educational')">
+            <div style="font-size:18px;margin-bottom:4px;">&#128218;</div>
+            <div class="node-title" style="font-size:12px;">Educational</div>
+            <span class="click-hint">click</span>
+          </div>
+          <div class="branch-box branch-deep" onclick="openModal('clarification')">
+            <div style="font-size:18px;margin-bottom:4px;">&#10067;</div>
+            <div class="node-title" style="font-size:12px;">Clarification</div>
+            <span class="click-hint">click</span>
+          </div>
+          <div class="branch-box branch-deep" onclick="openModal('specificSku')">
+            <div style="font-size:18px;margin-bottom:4px;">&#127991;&#65039;</div>
+            <div class="node-title" style="font-size:12px;">Specific SKU</div>
+            <span class="click-hint">click</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- ===== TWO-COLUMN: FAST EXIT vs DEEP PIPELINE ===== -->
+      <div style="display:flex;width:100%;max-width:1200px;justify-content:space-between;margin-top:8px;opacity:0;animation:fadeUp 0.4s ease forwards;animation-delay:0.54s;">
+
+        <!-- ===== LEFT: FAST EXIT PATH ===== -->
+        <div style="width:340px;display:flex;flex-direction:column;align-items:center;">
+
+          <!-- Merge lines from 3 intents -->
+          <svg width="340" height="40" style="display:block;">
+            <line x1="55" y1="0" x2="170" y2="35" stroke="#f59e0b88" stroke-width="1.5"/>
+            <line x1="170" y1="0" x2="170" y2="35" stroke="#f59e0b88" stroke-width="1.5"/>
+            <line x1="285" y1="0" x2="170" y2="35" stroke="#f59e0b88" stroke-width="1.5"/>
+          </svg>
+
+          <div class="v-connector">
+            <div class="v-head" style="border-top-color:#f59e0b;"></div>
+          </div>
+
+          <div class="path-label path-fast">FAST EXIT</div>
+
+          <!-- Pre-built Responses -->
+          <div class="node n-output" onclick="openModal('prebuilt')" style="width:290px;opacity:1;transform:none;animation:none;">
+            <div class="node-tag">Assigned Outputs</div>
+            <div class="node-title">Pre-Built Responses</div>
+            <div style="font-size:11px;color:#94a3b8;margin-top:6px;line-height:1.4;">No filters needed.<br>No product search.<br>Response assigned immediately.</div>
+            <span class="click-hint">click</span>
+          </div>
+
+          <div class="v-connector" style="padding:6px 0;">
+            <div class="v-line" style="height:24px;"></div>
+            <div class="v-head"></div>
+          </div>
+
+          <!-- Back to Storefront -->
+          <div style="padding:14px 20px;border-radius:12px;background:linear-gradient(135deg,#0f1d32,#162038);border:1.5px solid #2563eb44;text-align:center;width:290px;">
+            <div style="font-size:10px;font-weight:700;letter-spacing:1.6px;text-transform:uppercase;color:#60a5fa;margin-bottom:3px;">&#8617; Back to Storefront</div>
+            <div style="font-size:14px;font-weight:700;color:#93bbfc;">Display Response</div>
+          </div>
+        </div>
+
+        <!-- ===== RIGHT: DEEP PIPELINE PATH ===== -->
+        <div style="width:680px;display:flex;flex-direction:column;align-items:center;">
+
+          <!-- Merge lines from 5 intents -->
+          <svg width="680" height="40" style="display:block;">
+            <line x1="68" y1="0" x2="340" y2="35" stroke="#38bdf888" stroke-width="1.5"/>
+            <line x1="204" y1="0" x2="340" y2="35" stroke="#38bdf888" stroke-width="1.5"/>
+            <line x1="340" y1="0" x2="340" y2="35" stroke="#38bdf888" stroke-width="1.5"/>
+            <line x1="476" y1="0" x2="340" y2="35" stroke="#38bdf888" stroke-width="1.5"/>
+            <line x1="612" y1="0" x2="340" y2="35" stroke="#38bdf888" stroke-width="1.5"/>
+          </svg>
+
+          <div class="v-connector">
+            <div class="v-head" style="border-top-color:#38bdf8;"></div>
+          </div>
+
+          <div class="path-label path-deep">DEEP PIPELINE</div>
+
+          <!-- ===== STEP 4: FILTER EXTRACTOR ===== -->
+          <div class="node n-filter" onclick="openModal('filterExtractor')" style="width:560px;opacity:1;transform:none;animation:none;">
+            <div class="llm-badge">LLM x1</div>
+            <div class="node-tag">Step 4 &mdash; Filter Extractor</div>
+            <div class="node-title">Pull Out the Specs</div>
+            <div class="node-sub">LLM call &mdash; GPT-4o-mini</div>
+            <span class="click-hint">click</span>
+          </div>
+
+          <div class="arrow" style="opacity:1;">
+            <div class="arrow-line"></div>
+            <div class="arrow-head"></div>
+            <div class="arrow-text">intent + SearchFilters dataclass</div>
+          </div>
+
+          <!-- ===== STEP 5: HANDLERS ===== -->
+          <div style="width:100%;opacity:0;animation:fadeUp 0.5s ease forwards;animation-delay:0.68s;">
+            <div style="text-align:center;margin-bottom:8px;">
+              <div style="font-size:10px;font-weight:700;letter-spacing:1.6px;text-transform:uppercase;color:#fbbf24;margin-bottom:2px;">Step 5 &mdash; Handlers</div>
+              <div style="font-size:15px;font-weight:700;color:#fcd34d;">One per Intent</div>
+            </div>
+
+            <!-- 5 handler cards in a row -->
+            <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:10px;width:100%;">
+              <div class="handler-card" onclick="openModal('handlerSearch')">
+                <div class="llm-badge">LLM x1+</div>
+                <div style="font-size:16px;margin-bottom:4px;">&#128270;</div>
+                <div class="node-title" style="font-size:11px;">New Search</div>
+                <div style="font-size:9px;color:#94a3b8;margin-top:4px;">Includes narrowing<br>&amp; fallback cascade</div>
+                <span class="click-hint">click</span>
+              </div>
+              <div class="handler-card" onclick="openModal('handlerFollowup')">
+                <div class="llm-badge">LLM x1+</div>
+                <div style="font-size:16px;margin-bottom:4px;">&#128260;</div>
+                <div class="node-title" style="font-size:11px;">Follow-Up</div>
+                <div style="font-size:9px;color:#94a3b8;margin-top:4px;">Refine, compare,<br>or correct results</div>
+                <span class="click-hint">click</span>
+              </div>
+              <div class="handler-card" onclick="openModal('handlerEducational')">
+                <div style="font-size:16px;margin-bottom:4px;">&#128218;</div>
+                <div class="node-title" style="font-size:11px;">Educational</div>
+                <div style="font-size:9px;color:#94a3b8;margin-top:4px;">Tech questions,<br>may show products</div>
+                <span class="click-hint">click</span>
+              </div>
+              <div class="handler-card" onclick="openModal('handlerClarification')">
+                <div style="font-size:16px;margin-bottom:4px;">&#10067;</div>
+                <div class="node-title" style="font-size:11px;">Clarification</div>
+                <div style="font-size:9px;color:#94a3b8;margin-top:4px;">Vague query &mdash;<br>ask follow-up</div>
+                <span class="click-hint">click</span>
+              </div>
+              <div class="handler-card" onclick="openModal('handlerSku')">
+                <div style="font-size:16px;margin-bottom:4px;">&#127991;&#65039;</div>
+                <div class="node-title" style="font-size:11px;">Specific SKU</div>
+                <div style="font-size:9px;color:#94a3b8;margin-top:4px;">Direct product<br>lookup by number</div>
+                <span class="click-hint">click</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="arrow" style="opacity:0;animation:fadeUp 0.3s ease forwards;animation-delay:0.75s;">
+            <div class="arrow-line"></div>
+            <div class="arrow-head"></div>
+            <div class="arrow-text">structured data</div>
+          </div>
+
+          <!-- ===== STEP 6: OUTPUT LAYER ===== -->
+          <div class="node n-output" onclick="openModal('outputLayer')" style="width:560px;opacity:0;animation:fadeUp 0.5s ease forwards;animation-delay:0.82s;">
+            <div class="node-tag">Step 6 &mdash; Response &amp; Side Effects</div>
+            <div class="node-title">Each Handler &rarr; Its Own Output</div>
+            <div class="node-sub">Handlers generate responses &mdash; orchestrator applies context updates &amp; logging</div>
+            <span class="click-hint">click</span>
+          </div>
+
+          <div class="arrow" style="opacity:0;animation:fadeUp 0.3s ease forwards;animation-delay:0.89s;">
+            <div class="arrow-line"></div>
+            <div class="arrow-head"></div>
+            <div class="arrow-text">formatted response</div>
+          </div>
+
+          <!-- Back to Storefront -->
+          <div style="padding:14px 20px;border-radius:12px;background:linear-gradient(135deg,#0f1d32,#162038);border:1.5px solid #2563eb44;text-align:center;width:340px;opacity:0;animation:fadeUp 0.5s ease forwards;animation-delay:0.96s;">
+            <div style="font-size:10px;font-weight:700;letter-spacing:1.6px;text-transform:uppercase;color:#60a5fa;margin-bottom:3px;">&#8617; Back to Storefront</div>
+            <div style="font-size:14px;font-weight:700;color:#93bbfc;">Display Response</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="llm-summary" style="animation-delay:1.1s;margin-top:32px;">
+        LLM calls per query: <strong>1</strong> (fast exit: classifier only) &middot; <strong>2+</strong> (deep pipeline: classifier + filter extractor + handler) &middot; <strong>+1 per narrowing question</strong>
+      </div>
+
+      <div class="bottom-label">ST-Bot Architecture &middot; Intent-Based Routing Flow &middot; v2.0</div>
+    </div>
+  </div>
+
+  <!-- ============================================================ -->
+  <!-- ABOUT VIEW                                                    -->
+  <!-- ============================================================ -->
+  <div id="view-about" class="view">
+    <div class="about-content">
+      <h2>What is ST-Bot?</h2>
+      <p>ST-Bot is a conversational AI assistant built to help customers navigate <strong>StarTech.com's</strong> product catalog of 5,162 technology products. Instead of browsing filters and spec sheets, customers describe what they need in plain English and the bot finds the right products.</p>
+
+      <div class="stat-row">
+        <div class="stat-box">
+          <div class="num">5,162</div>
+          <div class="label">Products</div>
+        </div>
+        <div class="stat-box">
+          <div class="num">24</div>
+          <div class="label">Categories</div>
+        </div>
+        <div class="stat-box">
+          <div class="num">267</div>
+          <div class="label">Attributes</div>
+        </div>
+        <div class="stat-box">
+          <div class="num">84</div>
+          <div class="label">Tests</div>
+        </div>
+      </div>
+
+      <p>Built with <strong>Streamlit</strong>, powered by <strong>GPT-4o-mini</strong> for intent classification, filter extraction, response generation, and narrowing. The search engine uses a two-phase scoring system &mdash; mandatory gates eliminate wrong products instantly, then scored filters rank remaining matches 0.0&ndash;1.0 by relevance. Categories are managed from a single source of truth in <code>core/category_config.py</code>, with LLM prompts generated from config rather than hard-coded.</p>
+
+      <h2 style="margin-top:32px;">Architecture (v2.0)</h2>
+      <p>The pipeline follows a <strong>6-layer flow</strong>:</p>
+      <ul style="list-style:none; padding:0; margin:12px 0;">
+        <li style="padding:6px 0;"><strong>1. Storefront</strong> &mdash; Streamlit chat UI, the only layer the customer sees</li>
+        <li style="padding:6px 0;"><strong>2. Sorter</strong> &mdash; Sanitizes input, loads conversation state, prevents injection</li>
+        <li style="padding:6px 0;"><strong>3. Intent Classifier</strong> &mdash; LLM identifies the type of question (8 intents, 2 paths)</li>
+        <li style="padding:6px 0;"><strong>4. Filter Extractor</strong> &mdash; LLM pulls specs from the query into a structured dataclass</li>
+        <li style="padding:6px 0;"><strong>5. Handlers</strong> &mdash; One handler per intent, each with specialized logic</li>
+        <li style="padding:6px 0;"><strong>6. Assigned Outputs</strong> &mdash; Each handler maps to its own output; assignments can be re-wired independently</li>
+      </ul>
+
+      <h2 style="margin-top:32px;">Testing</h2>
+      <p>Three layers of automated testing protect against regressions:</p>
+      <ul style="list-style:none; padding:0; margin:12px 0;">
+        <li style="padding:6px 0;"><strong>Unit tests</strong> (<code>pytest tests/test_search_engine.py tests/test_derived_fields.py</code>) &mdash; 62 fast tests for search engine scoring, connector matching, and field normalization.</li>
+        <li style="padding:6px 0;"><strong>Integration tests</strong> (<code>pytest tests/test_integration.py</code>) &mdash; 22 mocked tests for the full pipeline (handlers, context, state management).</li>
+        <li style="padding:6px 0;"><strong>End-to-end test harness</strong> (<code>python tests/test_harness.py</code>) &mdash; Real LLM calls and real product data through the full pipeline.</li>
+      </ul>
+    </div>
+  </div>
+
+</div>
+
+<!-- ============================================================ -->
+<!-- MODAL                                                         -->
+<!-- ============================================================ -->
+<div class="modal-overlay" id="modal-overlay" onclick="if(event.target===this)closeModal()">
+  <div class="modal-panel">
+    <button class="modal-close" onclick="closeModal()">&times;</button>
+    <div id="modal-content"></div>
+  </div>
+</div>
+
+<script>
+// ----------------------------------------------------------------
+// NODE INFO — modal content for each clickable element
+// ----------------------------------------------------------------
+const NODE_INFO = {
+
+  storefront: {
+    label: 'STEP 1',
+    labelColor: '#60a5fa',
+    title: 'Storefront &mdash; Customer Chat UI',
+    html: `
+      <div class="modal-section">
+        <h4>What It Does</h4>
+        <p>This is the only thing a customer ever sees. It&rsquo;s the chat window where they type a question like
+        &ldquo;I need a 30ft USB-C to HDMI cable&rdquo; and get back a formatted product recommendation.</p>
+      </div>
+      <div class="modal-section">
+        <h4>Responsibilities</h4>
+        <ul>
+          <li>Displays the chat interface (text input + scrollable message history)</li>
+          <li>Loads 5,162 products from Excel on startup (cached)</li>
+          <li>Initializes all pipeline components</li>
+          <li>Captures user input and sends it to the Sorter</li>
+          <li>Renders the final formatted response</li>
+          <li>Includes a hidden debug panel for developers</li>
+        </ul>
+      </div>
+      <div class="modal-section">
+        <h4>Key File</h4>
+        <span class="modal-file-tag">app.py</span>
+      </div>
+    `
+  },
+
+  sorter: {
+    label: 'STEP 2',
+    labelColor: '#a78bfa',
+    title: 'Sorter &mdash; Clean &amp; Validate',
+    html: `
+      <div class="modal-section">
+        <h4>What It Does</h4>
+        <p>The first thing that happens to every message. It cleans the raw text and loads any saved conversation state before anything else touches it.</p>
+      </div>
+      <div class="modal-section">
+        <h4>Responsibilities</h4>
+        <ul>
+          <li>Limits queries to <strong>1,000 characters</strong> max</li>
+          <li>Blocks prompt injection attempts (5 regex patterns)</li>
+          <li>Strips extra whitespace</li>
+          <li>Passes the cleaned query + context forward</li>
+        </ul>
+      </div>
+      <div class="modal-section">
+        <h4>Blocked Patterns</h4>
+        <ul>
+          <li><code>ignore previous instructions</code></li>
+          <li><code>system:</code> prompt delimiters</li>
+          <li><code>&lt;|...|&gt;</code> injection delimiters</li>
+          <li><code>[INST]</code> Llama-style delimiters</li>
+          <li><code>&lt;&lt;SYS&gt;&gt;</code> system prompt delimiters</li>
+        </ul>
+      </div>
+      <div class="modal-section">
+        <h4>Key File</h4>
+        <span class="modal-file-tag">core/orchestrator.py</span>
+      </div>
+    `
+  },
+
+  intent: {
+    label: 'STEP 3',
+    labelColor: '#bef264',
+    title: 'Intent Classifier &mdash; What Type of Question?',
+    html: `
+      <div class="modal-section">
+        <h4>What It Does</h4>
+        <p>An LLM reads the cleaned query and conversation context, then decides what <em>type</em> of message the customer sent. This is the decision point that determines everything that happens next.</p>
+      </div>
+      <div class="modal-section">
+        <h4>8 Possible Intents</h4>
+        <ul>
+          <li><strong>Greeting</strong> &mdash; &ldquo;Hi&rdquo;, &ldquo;Hello&rdquo;</li>
+          <li><strong>Farewell</strong> &mdash; &ldquo;Thanks, bye&rdquo;</li>
+          <li><strong>Out of Scope</strong> &mdash; &ldquo;What&rsquo;s the weather?&rdquo;</li>
+          <li><strong>New Search</strong> &mdash; &ldquo;Show me USB-C hubs&rdquo;</li>
+          <li><strong>Follow-Up</strong> &mdash; &ldquo;Do any of those support 4K?&rdquo;</li>
+          <li><strong>Educational</strong> &mdash; &ldquo;What&rsquo;s the difference between USB-C and Thunderbolt?&rdquo;</li>
+          <li><strong>Clarification</strong> &mdash; Detected when query is too vague</li>
+          <li><strong>Specific SKU</strong> &mdash; &ldquo;Tell me about USB3SMDOCKG&rdquo;</li>
+        </ul>
+      </div>
+      <div class="modal-section">
+        <h4>Routing Logic</h4>
+        <ul>
+          <li><strong>Fast exit</strong> (3 intents) &rarr; Pre-built responses, no search needed</li>
+          <li><strong>Deep pipeline</strong> (5 intents) &rarr; Filter extraction + handlers + output</li>
+        </ul>
+      </div>
+      <div class="modal-section">
+        <h4>Key Behavior</h4>
+        <p>When a user answers a clarification question (e.g., bot asked &ldquo;What type of cable?&rdquo; and user says &ldquo;HDMI&rdquo;), the intent classifier re-classifies it as a <strong>New Search</strong> with context merged in &mdash; there is no separate &ldquo;clarification response&rdquo; intent.</p>
+      </div>
+      <div class="modal-section">
+        <h4>Key File</h4>
+        <span class="modal-file-tag">core/models/intent.py</span>
+        <span class="modal-file-tag">llm/llm_intent_classifier.py</span>
+      </div>
+    `
+  },
+
+  // --- INTENT CARDS (fast exit) ---
+
+  greeting: {
+    label: 'FAST EXIT',
+    labelColor: '#fbbf24',
+    title: 'Greeting',
+    html: `
+      <div class="modal-section">
+        <h4>What It Does</h4>
+        <p>Customer says &ldquo;Hi&rdquo;, &ldquo;Hello&rdquo;, or similar. Bot responds with a friendly welcome message.</p>
+      </div>
+      <div class="modal-section">
+        <h4>Example</h4>
+        <p>&ldquo;Hi there!&rdquo; &rarr; &ldquo;Hi! I&rsquo;m here to help you find StarTech.com products. What are you looking for?&rdquo;</p>
+      </div>
+    `
+  },
+
+  farewell: {
+    label: 'FAST EXIT',
+    labelColor: '#fbbf24',
+    title: 'Farewell',
+    html: `
+      <div class="modal-section">
+        <h4>What It Does</h4>
+        <p>Customer says &ldquo;Thanks, bye&rdquo; or similar. Bot responds with a closing message.</p>
+      </div>
+      <div class="modal-section">
+        <h4>Example</h4>
+        <p>&ldquo;Thanks for the help!&rdquo; &rarr; &ldquo;You&rsquo;re welcome! Feel free to come back anytime.&rdquo;</p>
+      </div>
+    `
+  },
+
+  forbidden: {
+    label: 'FAST EXIT',
+    labelColor: '#fbbf24',
+    title: 'Out of Scope',
+    html: `
+      <div class="modal-section">
+        <h4>What It Does</h4>
+        <p>Customer asks something outside the bot&rsquo;s scope. The LLM classifier identifies the specific type of out-of-scope request and the handler returns an appropriate response for each.</p>
+      </div>
+      <div class="modal-section">
+        <h4>Guardrail Sub-Types</h4>
+        <ul>
+          <li><strong>Customer Service</strong> &mdash; Returns, orders, shipping, installation &rarr; Directs to StarTech support (web + phone). Note: Warranty duration questions are answered from product data when available; only claims/returns redirect to support.</li>
+          <li><strong>Pricing</strong> &mdash; &ldquo;How much does this cost?&rdquo; &rarr; Directs to www.startech.com</li>
+          <li><strong>Competitor</strong> &mdash; &ldquo;Amazon has better prices&rdquo; &rarr; Politely refocuses on StarTech products</li>
+          <li><strong>Gibberish</strong> &mdash; Random text, keyboard mashing &rarr; Asks to rephrase</li>
+          <li><strong>Injection</strong> &mdash; &ldquo;Ignore your instructions&rdquo; &rarr; Reminds user of bot&rsquo;s purpose</li>
+          <li><strong>Fictional</strong> &mdash; Made-up products &rarr; Asks for a real product</li>
+          <li><strong>Off-Topic</strong> &mdash; Weather, politics, essays &rarr; Generic redirect to product help</li>
+        </ul>
+      </div>
+      <div class="modal-section">
+        <h4>Smart Nuance</h4>
+        <p>Budget mentions inside product queries are <strong>not</strong> guardrailed. &ldquo;How much does this cost?&rdquo; is out of scope, but &ldquo;I need a budget-friendly HDMI cable&rdquo; is treated as a normal product search. The LLM classifier makes this distinction contextually.</p>
+      </div>
+      <div class="modal-section">
+        <h4>Key File</h4>
+        <span class="modal-file-tag">handlers/greeting.py</span>
+        <span class="modal-file-tag">llm/llm_intent_classifier.py</span>
+      </div>
+    `
+  },
+
+  // --- INTENT CARDS (deep pipeline) ---
+
+  newSearch: {
+    label: 'DEEP PIPELINE',
+    labelColor: '#38bdf8',
+    title: 'New Search Intent',
+    html: `
+      <div class="modal-section">
+        <h4>What It Does</h4>
+        <p>Customer is looking for a product. This is the most common intent &mdash; it triggers the full search pipeline with filter extraction, catalog search, and response generation.</p>
+      </div>
+      <div class="modal-section">
+        <h4>Examples</h4>
+        <ul>
+          <li>&ldquo;I need a 6ft USB-C to HDMI cable&rdquo;</li>
+          <li>&ldquo;Show me docking stations with dual monitor support&rdquo;</li>
+          <li>&ldquo;Do you have any 4-port KVM switches?&rdquo;</li>
+        </ul>
+      </div>
+    `
+  },
+
+  followUp: {
+    label: 'DEEP PIPELINE',
+    labelColor: '#38bdf8',
+    title: 'Follow-Up Intent',
+    html: `
+      <div class="modal-section">
+        <h4>What It Does</h4>
+        <p>Customer is asking about products already shown &mdash; refining, comparing, correcting, or asking questions about the current results.</p>
+      </div>
+      <div class="modal-section">
+        <h4>Examples</h4>
+        <ul>
+          <li>&ldquo;Do any of those support 4K at 60Hz?&rdquo;</li>
+          <li>&ldquo;Which one is the cheapest?&rdquo;</li>
+          <li>&ldquo;I meant DisplayPort, not HDMI&rdquo;</li>
+          <li>&ldquo;Show me longer options&rdquo;</li>
+        </ul>
+      </div>
+    `
+  },
+
+  educational: {
+    label: 'DEEP PIPELINE',
+    labelColor: '#38bdf8',
+    title: 'Educational Intent',
+    html: `
+      <div class="modal-section">
+        <h4>What It Does</h4>
+        <p>Customer is asking a general tech question, not searching for a product. May reference relevant products if helpful.</p>
+      </div>
+      <div class="modal-section">
+        <h4>Examples</h4>
+        <ul>
+          <li>&ldquo;What&rsquo;s the difference between USB-C and Thunderbolt?&rdquo;</li>
+          <li>&ldquo;Can I daisy-chain monitors with DisplayPort?&rdquo;</li>
+          <li>&ldquo;What does Cat6a mean?&rdquo;</li>
+        </ul>
+      </div>
+    `
+  },
+
+  clarification: {
+    label: 'DEEP PIPELINE',
+    labelColor: '#38bdf8',
+    title: 'Clarification Intent',
+    html: `
+      <div class="modal-section">
+        <h4>What It Does</h4>
+        <p>The query is too vague to search effectively. Instead of returning random results, the bot asks a targeted follow-up question to understand what the customer actually needs.</p>
+      </div>
+      <div class="modal-section">
+        <h4>Examples</h4>
+        <ul>
+          <li>&ldquo;I need a cable&rdquo; &rarr; &ldquo;What type of cable? USB, HDMI, Ethernet...?&rdquo;</li>
+          <li>&ldquo;adapter&rdquo; &rarr; &ldquo;What are you connecting from and to?&rdquo;</li>
+        </ul>
+      </div>
+      <div class="modal-section">
+        <h4>Key Behavior</h4>
+        <p>Clarification is <strong>one-directional</strong>: this handler only <em>asks</em> questions. When the customer answers, the intent classifier re-classifies their response (usually as New Search) with the clarification context merged in.</p>
+      </div>
+    `
+  },
+
+  specificSku: {
+    label: 'DEEP PIPELINE',
+    labelColor: '#38bdf8',
+    title: 'Specific SKU Intent',
+    html: `
+      <div class="modal-section">
+        <h4>What It Does</h4>
+        <p>Customer mentions a specific product number (SKU). Instead of searching, the bot does a direct lookup and shows detailed product information.</p>
+      </div>
+      <div class="modal-section">
+        <h4>Examples</h4>
+        <ul>
+          <li>&ldquo;Tell me about USB3SMDOCKG&rdquo;</li>
+          <li>&ldquo;What are the specs for HD2DPMM6&rdquo;</li>
+          <li>&ldquo;Do you carry the SATDOCK4U3RE?&rdquo;</li>
+        </ul>
+      </div>
+      <div class="modal-section">
+        <h4>Key File</h4>
+        <span class="modal-file-tag">handlers/sku.py</span>
+      </div>
+    `
+  },
+
+  // --- PRE-BUILT RESPONSES ---
+
+  prebuilt: {
+    label: 'FAST EXIT',
+    labelColor: '#f472b6',
+    title: 'Pre-Built Responses',
+    html: `
+      <div class="modal-section">
+        <h4>What It Does</h4>
+        <p>For the 3 fast-exit intents (Greeting, Farewell, Out of Scope), there&rsquo;s no product search needed. The response is selected from a set of pre-built templates and returned immediately.</p>
+      </div>
+      <div class="modal-section">
+        <h4>Why No Filters?</h4>
+        <p>These intents have no product-related content to extract. Running the filter extractor would waste an LLM call for nothing. The response is deterministic.</p>
+      </div>
+    `
+  },
+
+  // --- FILTER EXTRACTOR ---
+
+  filterExtractor: {
+    label: 'STEP 4',
+    labelColor: '#22d3ee',
+    title: 'Filter Extractor &mdash; Pull Out the Specs',
+    html: `
+      <div class="modal-section">
+        <h4>What It Does</h4>
+        <p>An LLM reads the customer&rsquo;s query and extracts structured product specifications &mdash; connector types, cable lengths, resolutions, port counts, colors, and more. It turns plain English into a structured <code>SearchFilters</code> dataclass.</p>
+      </div>
+      <div class="modal-section">
+        <h4>What It Extracts</h4>
+        <ul>
+          <li><strong>Connectors</strong> &mdash; USB-C, HDMI, DisplayPort, etc.</li>
+          <li><strong>Length</strong> &mdash; 6ft, 10m, etc. (with unit conversion)</li>
+          <li><strong>Category</strong> &mdash; cable, dock, hub, adapter, etc.</li>
+          <li><strong>Features</strong> &mdash; 4K, Thunderbolt, PoE, etc.</li>
+          <li><strong>Port count</strong> &mdash; 4-port, 7-port, etc.</li>
+          <li><strong>Color</strong> &mdash; black, white, etc.</li>
+          <li><strong>Keywords</strong> &mdash; anything else for text matching</li>
+          <li>...and 18 more optional fields</li>
+        </ul>
+      </div>
+      <div class="modal-section">
+        <h4>Output: SearchFilters Dataclass</h4>
+        <p>A single structured object with 25 optional fields. Most fields are <code>None</code> &mdash; only the ones relevant to the query get populated. For example, &ldquo;6ft USB-C to HDMI cable&rdquo; fills: <code>length=6.0</code>, <code>connector_from=&ldquo;USB-C&rdquo;</code>, <code>connector_to=&ldquo;HDMI&rdquo;</code>, <code>product_category=&ldquo;cable&rdquo;</code>.</p>
+      </div>
+      <div class="modal-section">
+        <h4>When It Runs</h4>
+        <p>Runs for <strong>New Search</strong>, <strong>Clarification</strong>, and some <strong>Follow-Up</strong> (refinement) queries. Does <em>not</em> run for Educational or Specific SKU &mdash; those handlers skip filter extraction and go straight to their own logic.</p>
+      </div>
+      <div class="modal-section">
+        <h4>Key Files</h4>
+        <span class="modal-file-tag">llm/llm_filter_extractor.py</span>
+        <span class="modal-file-tag">core/models/filters.py</span>
+        <span class="modal-file-tag">core/models/conversation.py</span>
+      </div>
+    `
+  },
+
+  // --- HANDLERS ---
+
+  handlerSearch: {
+    label: 'HANDLER',
+    labelColor: '#fbbf24',
+    title: 'New Search Handler',
+    html: `
+      <div class="modal-section">
+        <h4>What It Does</h4>
+        <p>The most complex handler. Takes the SearchFilters and searches the product catalog using a two-phase scoring system: mandatory gates eliminate wrong products, then scored filters rank remaining matches.</p>
+      </div>
+      <div class="modal-section">
+        <h4>Internal Steps</h4>
+        <ul>
+          <li><strong>Vagueness gate</strong> &mdash; If filters aren&rsquo;t specific enough, ask for clarification first</li>
+          <li><strong>&ldquo;Already meets&rdquo; check</strong> &mdash; If current products (&le;5) already match the new criteria, say so</li>
+          <li><strong>Search</strong> &mdash; Apply filters against 5,162 products (gates + scored filters)</li>
+          <li><strong>Unmet criteria warning</strong> &mdash; If requested length exceeds catalog max, warn upfront</li>
+          <li><strong>Fallback cascade</strong> &mdash; If no results: category swap, connector relaxation, structured filter relaxation, &ldquo;we don&rsquo;t carry that&rdquo; for catalog gaps</li>
+          <li><strong>Narrowing</strong> &mdash; If &gt;5 tied results, ask LLM-driven narrowing questions</li>
+          <li><strong>Spec verification</strong> &mdash; Check if returned products actually match requested specs (refresh rate, power wattage)</li>
+          <li><strong>Response generation</strong> &mdash; LLM crafts natural-language response with tiered product data</li>
+        </ul>
+      </div>
+      <div class="modal-section">
+        <h4>Key Files</h4>
+        <span class="modal-file-tag">handlers/search.py</span>
+        <span class="modal-file-tag">core/search/engine.py</span>
+        <span class="modal-file-tag">handlers/narrowing.py</span>
+      </div>
+    `
+  },
+
+  handlerFollowup: {
+    label: 'HANDLER',
+    labelColor: '#fbbf24',
+    title: 'Follow-Up Handler',
+    html: `
+      <div class="modal-section">
+        <h4>What It Does</h4>
+        <p>Handles follow-up questions about products already shown. Can refine results, compare products, correct filters, or answer spec questions.</p>
+      </div>
+      <div class="modal-section">
+        <h4>Capabilities</h4>
+        <ul>
+          <li><strong>Specs / Details</strong> &mdash; &ldquo;Does the first one support 4K?&rdquo;, &ldquo;What&rsquo;s the warranty?&rdquo;</li>
+          <li><strong>Comparison</strong> &mdash; &ldquo;How do the first two compare on power delivery?&rdquo;</li>
+          <li><strong>Refinement</strong> &mdash; &ldquo;Show me shorter ones&rdquo;, &ldquo;Between 3 and 6 feet&rdquo;</li>
+          <li><strong>Correction</strong> &mdash; &ldquo;I meant DisplayPort, not HDMI&rdquo;</li>
+          <li><strong>Recommendation</strong> &mdash; &ldquo;Which would you recommend?&rdquo;</li>
+          <li><strong>Compatibility</strong> &mdash; &ldquo;Are they compatible with Mac?&rdquo; (hardware-agnostic detection for cables, mounts, switches)</li>
+          <li><strong>Recall</strong> &mdash; &ldquo;Go back to those docks from earlier&rdquo;</li>
+        </ul>
+      </div>
+      <div class="modal-section">
+        <h4>Architecture</h4>
+        <p>Split into two files: <code>followup.py</code> (~690 lines) handles routing, specs, compatibility, educational, and recommendations. <code>followup_refinement.py</code> (~595 lines) provides a RefinementMixin with length/feature-based refinement and search helpers, inherited via multiple inheritance.</p>
+      </div>
+      <div class="modal-section">
+        <h4>Key Files</h4>
+        <span class="modal-file-tag">handlers/followup.py</span>
+        <span class="modal-file-tag">handlers/followup_refinement.py</span>
+      </div>
+    `
+  },
+
+  handlerEducational: {
+    label: 'HANDLER',
+    labelColor: '#fbbf24',
+    title: 'Educational Handler',
+    html: `
+      <div class="modal-section">
+        <h4>What It Does</h4>
+        <p>Answers general technology questions. May reference relevant StarTech products if applicable, but the primary goal is education, not sales.</p>
+      </div>
+      <div class="modal-section">
+        <h4>Examples</h4>
+        <ul>
+          <li>&ldquo;What&rsquo;s the difference between Cat5e and Cat6?&rdquo;</li>
+          <li>&ldquo;Can I use a USB-C hub with my MacBook?&rdquo;</li>
+          <li>&ldquo;What is Power over Ethernet?&rdquo;</li>
+        </ul>
+      </div>
+      <div class="modal-section">
+        <h4>Key File</h4>
+        <span class="modal-file-tag">handlers/educational.py</span>
+      </div>
+    `
+  },
+
+  handlerClarification: {
+    label: 'HANDLER',
+    labelColor: '#fbbf24',
+    title: 'Clarification Handler',
+    html: `
+      <div class="modal-section">
+        <h4>What It Does</h4>
+        <p>When a query is too vague to produce useful results, this handler asks a targeted follow-up question instead of returning random products.</p>
+      </div>
+      <div class="modal-section">
+        <h4>How It Works</h4>
+        <ul>
+          <li>Detects the type of vagueness (missing category, missing connector, etc.)</li>
+          <li>Asks a specific follow-up question</li>
+          <li>When the customer answers, the <strong>intent classifier</strong> re-classifies the response (usually as New Search) with clarification context merged in</li>
+        </ul>
+      </div>
+      <div class="modal-section">
+        <h4>Key Behavior</h4>
+        <p>This handler is <strong>one-directional</strong>: it only asks questions. It never processes answers &mdash; that&rsquo;s the intent classifier&rsquo;s job on the next turn.</p>
+      </div>
+      <div class="modal-section">
+        <h4>Key File</h4>
+        <span class="modal-file-tag">handlers/clarification.py</span>
+      </div>
+    `
+  },
+
+  handlerSku: {
+    label: 'HANDLER',
+    labelColor: '#fbbf24',
+    title: 'Specific SKU Handler',
+    html: `
+      <div class="modal-section">
+        <h4>What It Does</h4>
+        <p>When a customer mentions a specific product number (SKU), this handler does a direct lookup instead of running a full search. Returns detailed product information for the exact product.</p>
+      </div>
+      <div class="modal-section">
+        <h4>Examples</h4>
+        <ul>
+          <li>&ldquo;Tell me about USB3SMDOCKG&rdquo;</li>
+          <li>&ldquo;What are the specs for HD2DPMM6?&rdquo;</li>
+        </ul>
+      </div>
+      <div class="modal-section">
+        <h4>Key File</h4>
+        <span class="modal-file-tag">handlers/sku.py</span>
+      </div>
+    `
+  },
+
+  // --- OUTPUT LAYER ---
+
+  outputLayer: {
+    label: 'STEP 6',
+    labelColor: '#f472b6',
+    title: 'Response Generation &mdash; Each Handler &rarr; Its Own Output',
+    html: `
+      <div class="modal-section">
+        <h4>What It Does</h4>
+        <p>Each handler generates its own complete response. Handlers that need rich product responses call the LLM response generator; simpler handlers (greeting, farewell, out-of-scope) use pre-built templates. The orchestrator then applies side effects (context updates, logging, debug output).</p>
+      </div>
+      <div class="modal-section">
+        <h4>Handler &rarr; Response Type</h4>
+        <ul>
+          <li><strong>New Search</strong> &rarr; LLM-generated product recommendations with specs</li>
+          <li><strong>Follow-Up</strong> &rarr; LLM-generated response using products in context</li>
+          <li><strong>Educational</strong> &rarr; LLM-generated tech explanation, optionally with related products</li>
+          <li><strong>Clarification</strong> &rarr; LLM-generated follow-up question to narrow the query</li>
+          <li><strong>Specific SKU</strong> &rarr; LLM-generated detailed info for the matched product</li>
+        </ul>
+      </div>
+      <div class="modal-section">
+        <h4>Orchestrator Side Effects</h4>
+        <ul>
+          <li>Saves products to conversation context for follow-up queries</li>
+          <li>Manages pending clarification and narrowing state</li>
+          <li>Records to search history for recall functionality</li>
+          <li>Structured logging (JSON + CSV) for every conversation turn</li>
+        </ul>
+      </div>
+      <div class="modal-section">
+        <h4>Key Files</h4>
+        <span class="modal-file-tag">core/orchestrator.py</span>
+        <span class="modal-file-tag">llm/llm_response_generator.py</span>
+      </div>
+    `
+  }
+
+};
+
+// ----------------------------------------------------------------
+// View switching
+// ----------------------------------------------------------------
+function switchView(name) {
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('view-' + name).classList.add('active');
+  event.target.classList.add('active');
+}
+
+// ----------------------------------------------------------------
+// Modal
+// ----------------------------------------------------------------
+function openModal(key) {
+  const info = NODE_INFO[key];
+  if (!info) return;
+  const html = `
+    <div class="modal-label" style="color:${info.labelColor}">${info.label}</div>
+    <div class="modal-title">${info.title}</div>
+    ${info.html}
+  `;
+  document.getElementById('modal-content').innerHTML = html;
+  document.getElementById('modal-overlay').classList.add('open');
+}
+
+function closeModal() {
+  document.getElementById('modal-overlay').classList.remove('open');
+}
+
+// Close modal with Escape key
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') closeModal();
+});
+</script>
+
+</body>
+</html>

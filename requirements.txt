@@ -1,0 +1,33 @@
+# ST-Bot Dependencies
+# StarTech.com Product Chatbot - Clean Architecture
+
+# === Core Dependencies ===
+streamlit>=1.31.0
+python-dotenv>=1.0.0
+
+# === LangChain & LLM ===
+langchain>=0.1.0
+langchain-openai>=0.0.5
+langchain-pinecone>=0.0.1
+openai>=1.12.0
+
+# === Vector Store ===
+pinecone-client>=2.2.0
+
+# === Data Processing ===
+pandas>=2.0.0
+openpyxl>=3.1.0
+
+# === Cloud Logging (Google Sheets) ===
+gspread>=6.0.0
+google-auth>=2.0.0
+
+# === Testing ===
+pytest>=8.0.0
+pytest-cov>=4.1.0
+pytest-mock>=3.12.0
+
+# === Development ===
+black>=24.0.0
+flake8>=7.0.0
+mypy>=1.8.0
