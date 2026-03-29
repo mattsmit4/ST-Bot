@@ -18,7 +18,7 @@ import uuid
 
 import streamlit as st
 
-from data.loader import load_startech_products, get_product_statistics
+from data.loader import load_startech_products
 from core.models import ConversationContext
 from core.search import SearchEngineWrapper
 from core.orchestrator import process_query, OrchestratorComponents
@@ -86,7 +86,7 @@ SPINNER_MESSAGES = [
 
 from config import get_config_value as _get_config_value
 
-DEBUG_MODE = _get_config_value('DEBUG_MODE', 'true') == 'true'
+DEBUG_MODE = _get_config_value('DEBUG_MODE', 'false') == 'true'
 
 # Initialize structured logging (module level — runs once)
 setup_logging(
@@ -122,12 +122,11 @@ def load_products(excel_path: str):
     """Load products from Excel (cached across reruns)."""
     try:
         products = load_startech_products(excel_path)
-        stats = get_product_statistics(products)
-        return products, stats, None
+        return products, None
     except FileNotFoundError:
-        return [], {}, f"File not found: {excel_path}"
+        return [], f"File not found: {excel_path}"
     except Exception as e:
-        return [], {}, f"Error loading Excel: {str(e)}"
+        return [], f"Error loading Excel: {str(e)}"
 
 
 def get_components(products) -> OrchestratorComponents:
@@ -154,18 +153,10 @@ def main():
     st.title("🤖 ST-Bot - StarTech.com Product Assistant")
     st.markdown("*Your dedicated connectivity expert — here to help you find the right product, answer technical questions, and compare options.*")
 
-    # --- Sidebar: Configuration ---
-    with st.sidebar:
-        st.header("⚙️ Configuration")
-        excel_path = st.text_input(
-            "📁 Excel File Path",
-            value="ProductAttributeValues_Cleaned_Exported.xlsx",
-            help="Path to your Excel file",
-        )
-        st.markdown("---")
+    excel_path = "ProductAttributeValues_Cleaned_Exported.xlsx"
 
     # --- Load products ---
-    products, stats, error = load_products(excel_path)
+    products, error = load_products(excel_path)
 
     if error:
         st.error(f"❌ {error}")
@@ -176,25 +167,6 @@ def main():
         st.warning("⚠️ No products loaded. Check your Excel file.")
         st.stop()
 
-    # --- Sidebar: Product Statistics ---
-    with st.sidebar:
-        st.header("📦 Product Catalog")
-        st.metric("Total Products", stats['total'])
-
-        col1, col2 = st.columns(2)
-        with col1:
-            st.metric("With Length", stats['with_length'])
-        with col2:
-            st.metric("With Connectors", stats['with_connectors'])
-
-        with st.expander("📊 Categories"):
-            for cat, count in sorted(
-                stats['by_category'].items(), key=lambda x: x[1], reverse=True
-            )[:10]:
-                st.write(f"• **{cat.title()}:** {count}")
-
-        st.markdown("---")
-
     # --- Initialize session state ---
     if "context" not in st.session_state:
         st.session_state.context = ConversationContext(
@@ -204,31 +176,6 @@ def main():
 
     # --- Components ---
     components = get_components(products)
-
-    # --- Sidebar: Session Stats ---
-    with st.sidebar:
-        st.header("📊 Session Stats")
-        session_id = st.session_state.context.session_id or ""
-        st.write(f"**Session ID:** `{session_id[:16]}...`")
-        st.write(f"**Messages:** {len(st.session_state.messages)}")
-
-        if st.session_state.context.current_products:
-            st.write(
-                f"**Products in Context:** "
-                f"{len(st.session_state.context.current_products)}"
-            )
-
-        if st.button("🔄 New Session"):
-            st.session_state.context = ConversationContext(
-                session_id=str(uuid.uuid4())
-            )
-            st.session_state.messages = []
-            st.rerun()
-
-        if st.button("🗑️ Clear Product Cache"):
-            st.cache_resource.clear()
-            st.success("Cache cleared! Reloading products...")
-            st.rerun()
 
     # --- Display chat history (or welcome message) ---
     if not st.session_state.messages:
@@ -300,16 +247,6 @@ def main():
 
             st.markdown(response)
 
-            # Debug expander
-            if DEBUG_MODE:
-                with st.expander("🔍 Debug Info"):
-                    st.write(f"**Intent Detected:** {intent_type}")
-                    st.write(f"**Total Products Available:** {len(products)}")
-                    if st.session_state.context.current_products:
-                        st.write(
-                            f"**Products in Context:** "
-                            f"{len(st.session_state.context.current_products)}"
-                        )
 
         # Save assistant message for display history
         st.session_state.messages.append(
