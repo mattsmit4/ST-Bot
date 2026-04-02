@@ -108,8 +108,7 @@ Use groups like:
 Only include groups that have relevant data for this product.
 Do NOT write sentences or paragraphs — use the bullet-point format shown above.
 Start with a one-line product summary, then go straight into spec groups.
-
-End with a brief question that helps the user decide (e.g., what they're connecting, or which feature matters most) — not yes/no questions about showing more specs.""",
+Do NOT end with a follow-up question — the user will ask if they need more info.""",
 
     ResponseType.SPECS_TABLE: """
 Show specifications for all products.
